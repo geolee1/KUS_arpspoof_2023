@@ -96,8 +96,8 @@ def main(*args, **kwargs) -> int:
     own_ip = get_all_ip_addresses()
     own_mac = ":".join([uuid.UUID(int=uuid.getnode()).hex[-12:][i:i+2] for i in range(0, 12, 2)])
     
-    print(f"own_ip: {own_ip}")
-    print(f"own_mac: {own_mac}")
+    if DEBUG : print(f"own_ip: {own_ip}")
+    if DEBUG : print(f"own_mac: {own_mac}")
     
     
     if argc >= 2 and not ("--multiple" in argv or "-m" in argv):
