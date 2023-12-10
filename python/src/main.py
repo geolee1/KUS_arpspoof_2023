@@ -121,7 +121,7 @@ def main(*args, **kwargs) -> int:
         print(f"usage: {argv[0]} [options] [<args>]\n")
         print("Options:")
         print("   <gateway ip> <target ip 1> [<target ip 2> ..]   ARP Spoofing")
-        print("   -n --network <gateway ip> <network CIDR>       ARP Spoofing for all network targets")
+        print("   -n --network <gateway ip> <network CIDR>        ARP Spoofing for all network targets")
         print("   -h --help                                       Show this help message and exit")
         return 0
     
