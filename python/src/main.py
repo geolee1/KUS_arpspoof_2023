@@ -108,7 +108,7 @@ def main(*args, **kwargs) -> int:
             if DEBUG: print(f"target_ip: {ip}")
             target_ips.append(ip)
         
-    elif argc == 3 and (argv[1] == "--multiple" or argv[1] == "-m"):
+    elif argc == 3 and (argv[1] == "--network" or argv[1] == "-n"):
         network_cidr = argv[3]
         
         target_ips = scan_network(network_cidr, my_ip = own_ip)
@@ -121,7 +121,7 @@ def main(*args, **kwargs) -> int:
         print(f"usage: {argv[0]} [options] [<args>]\n")
         print("Options:")
         print("   <gateway ip> <target ip 1> [<target ip 2> ..]   ARP Spoofing")
-        print("   -m --multiple <gateway ip> <network CIDR>       ARP Spoofing for all network targets")
+        print("   -n --network <gateway ip> <network CIDR>       ARP Spoofing for all network targets")
         print("   -h --help                                       Show this help message and exit")
         return 0
     
