@@ -82,6 +82,9 @@ def main(*args, **kwargs) -> int:
     except KeyboardInterrupt:
         restoreARP(target_ip, target_mac, gateway_ip, gateway_mac)
         print("ARP Spoofing 종료 -> RESTORED ARP table")
+        
+    return 0
+
 
 if __name__ == "__main__":
     sys.exit(main(argc=len(sys.argv), argv=sys.argv))
