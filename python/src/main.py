@@ -3,6 +3,8 @@
 # Python Ver : 3.12.0
 VERSION = "1.0.0"
 
+DEBUG = True
+
 # Import Library
 from scapy.all import * #enables the user to send, sniff, dissect and forge network packets
 from scapy.layers.l2 import Ether, ARP #Classes and functions for layer 2 protocols.
@@ -15,11 +17,12 @@ ARP_REQUEST = 1
 ARP_REPLY = 2
 
 # Broadcast Address
-BROADCAST_MAC = 'ff-ff-ff-ff-ff-ff'
+BROADCAST_MAC = 'ff:ff:ff:ff:ff:ff'
 
 def getMAC(target_ip:str) -> str | None:
     '''IP 주소를 입력받아 MAC 주소를 리턴한다.'''
-    
+    if DEBUG:
+        print(f"getMAC({target_ip})")
     # target_ip의 MAC 주소를 알아내기 위해 ARP 패킷을 broadcast로 전송
     # 타임아웃 5초, 재시도 3번
     # 리턴값 : (송신패킷, 수신패킷)리스트, 송신패킷 리스트
@@ -28,7 +31,9 @@ def getMAC(target_ip:str) -> str | None:
     # 수신된 패킷에서 MAC 주소를 리턴
     for sent_packet, received_packet in sndrcvlist:
         # 찾았으면 MAC 주소 리턴, 못찾았으면 None 리턴
-        return received_packet.sptintf('%Ether.src%')
+        if DEBUG:
+            print(f"return {received_packet.sprintf('%Ether.src%')}")
+        return received_packet.sprintf('%Ether.src%')
     
     
 def poisonARP(sender_ip:str, target_ip:str, target_mac:str) -> None:
@@ -72,7 +77,9 @@ def main(*args, **kwargs) -> int:
         target_ip = argv[2] # 희생자 IP
         
         target_ips = [] # 희생자 IP 리스트
-        for ip in argv[3:]:
+        for ip in argv[2:]:
+            if DEBUG:
+                print(f"target_ip: {ip}")
             target_ips.append(ip)
         
     elif argc == 3 and (argv[1] == "--multiple" or argv[1] == "-m"):
@@ -93,8 +100,8 @@ def main(*args, **kwargs) -> int:
     
     # 게이트웨이 IP
     gateway_ip = argv[1] 
-
-    # IP 주소로 MAC 주소를 알아낸다
+    
+    # MAC주소 찾기
     gateway_mac = getMAC(gateway_ip)
     target_macs = []
     for ip in target_ips:
@@ -103,6 +110,7 @@ def main(*args, **kwargs) -> int:
     # MAC 주소를 찾을 수 없으면 종료
     if gateway_mac == None: 
         print('Gateway MAC 주소를 찾을 수 없습니다')
+        return -1
     for mac in target_macs:
         if mac == None:
             print('Target MAC 주소를 찾을 수 없습니다')
