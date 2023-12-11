@@ -100,7 +100,7 @@ def main(*args, **kwargs) -> int:
     if DEBUG : print(f"own_mac: {own_mac}")
     
     
-    if argc >= 2 and not ("--multiple" in argv or "-m" in argv):
+    if argc >= 2 and not ("--network" in argv or "-n" in argv):
         target_ip = argv[2] # 희생자 IP
         
         target_ips = [] # 희생자 IP 리스트
