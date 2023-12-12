@@ -1,9 +1,9 @@
 # ARP Spoofing Program
 # Update : 2023-12-10
 # Python Ver : 3.12.0
-VERSION = "1.0.0"
+PROGRAM_VERSION = "1.0.0"
 
-DEBUG = True
+DEBUG = False
 
 # Import Library
 from scapy.all import * #enables the user to send, sniff, dissect and forge network packets
@@ -67,6 +67,7 @@ def scan_network(ip_range, timeout=1, my_ip=None):
 
     for ip in ipaddress.IPv4Network(ip_range, strict=False):
         ip_str = str(ip)
+        if DEBUG : print(f"ping to [{ip_str}] : ", end="")
         result = subprocess.call(['ping', '-n', '1', '-w', str(timeout), ip_str], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
         if result == 0:
@@ -101,12 +102,14 @@ def main(*args, **kwargs) -> int:
     
     
     if argc >= 2 and not ("--network" in argv or "-n" in argv):
+        gateway_ip = argv[1] # 게이트웨이 IP
         target_ips = [] # 희생자 IP 리스트
         for ip in argv[2:]:
             if DEBUG: print(f"target_ip: {ip}")
             target_ips.append(ip)
         
     elif argc == 3 and (argv[1] == "--network" or argv[1] == "-n"):
+        gateway_ip = argv[2] # 게이트웨이 IP
         network_cidr = argv[3]
         
         target_ips = scan_network(network_cidr, my_ip = own_ip)
@@ -115,17 +118,13 @@ def main(*args, **kwargs) -> int:
             return -1
     
     else:
-        print(f"ARP Spoofing Program {VERSION}\n")
+        print(f"ARP Spoofing Program {PROGRAM_VERSION}\n")
         print(f"usage: {argv[0]} [options] [<args>]\n")
         print("Options:")
         print("   <gateway ip> <target ip 1> [<target ip 2> ..]   ARP Spoofing")
         print("   -n --network <gateway ip> <network CIDR>        ARP Spoofing for all network targets")
         print("   -h --help                                       Show this help message")
         return 0
-    
-    
-    # 게이트웨이 IP
-    gateway_ip = argv[1] 
     
     # MAC주소 찾기
     gateway_mac = getMAC(gateway_ip)
