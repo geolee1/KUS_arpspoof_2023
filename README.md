@@ -1,68 +1,50 @@
-# arpspoof - A simple ARP spoofer for Windows
+# arpspoof - 윈도우용 ARP Spoofing 프로그램
 
-`arpspoof` mounts an [ARP spoofing](https://en.wikipedia.org/wiki/ARP_spoofing) attack against a host on the local network. This results in traffic from the attacked host to the default gateway (and all non-LAN hosts) and back going through the local computer and can thus be captured with tools like [Wireshark](https://www.wireshark.org/). `arpspoof` will also forward this traffic, so Windows does NOT have to be configured as a router.
+이 프로그램은 `고려대학교 세종캠퍼스 2023 통신및네트워크 수업 과제`로 작성한 프로그램으로, [alandau/arpspoof](https://github.com/alandau/arpspoof) 코드에 기반한 C++ 버전의 단일 Host에 대한 ARP Spoofing 프로그램과, [「python을 이용한 ARP 스푸핑 구현하기 by 웹하는빡통」](https://webstone.tistory.com/107) 코드에 기반한 단일/다중 Host에 대한 python 버전의 ARP Spoofing 프로그램입니다.
 
-### TL;DR:
-```
-C:\>arpspoof.exe 192.168.1.10
-Resolving victim and target...
-Redirecting 192.168.1.10 (00:11:22:33:44:55) ---> 192.168.1.1 (22:33:44:55:66:77)
-        and in the other direction
-Press Ctrl+C to stop
-```
+이하 문서에서는 `python 버전의 코드`를 소개하고자 합니다. C++ 프로그램에 대한 설명은 해당 폴더 내 마크다운 문서를 확인하기 바랍니다.
 
-Then run `tcpdump` (or [Wireshark](https://www.wireshark.org/)) on the local host with the victim's MAC as a filter:
-```
-tcpdump ether host 00:11:22:33:44:55
-```
-
-When done, stop `arpspoof`:
-```
-^C
-Unspoofing
-Done
-```
-
-### Download
-
-Download `arpspoof.exe` from the [Releases](https://github.com/alandau/arpspoof/releases) page.
-
-### Usage
-```
-C:\>arpspoof.exe --help
-arpspoof.exe --list | [-i iface] [--oneway] victim-ip [target-ip]
-```
-- `--list` lists the available network interfaces
-- `victim-ip` is the IP of the host against which the spoofing attack is mounted (i.e., it is the host that will send us its traffic thinking we are the target host (the default gateway).
-- `target-ip` is the host we are pretending to be (as far as `victim-ip` is concerned). If not specified, the default gateway is used as the target (and thus victim's Internet-bound traffic can be captured).
-- By default, traffic in both the `victim -> target` and `target -> victim` directions are redirected to the local computer. `--oneway` makes only the `victim -> target` direction to be redirected.
-- `-i iface`. An interface on which to spoof ARPs will be automatically detected based on the IP addresses and masks assigned to the local interfaces and `victim-ip`. Use this option to force a specific interface. Use `--list` to see the available options. Both `-i 1` and `-i \Device\NPF_{A91C1830-2930-4B12-8017-6664270142F4}` formats are supported.
-
-
-List available interfaces for capturing/spoofing:
+### 요약
 
 ```
-C:\>arpspoof.exe --list
-1. \Device\NPF_{A91C1830-2930-4B12-8017-6664270142F4}   VirtualBox Host-Only Ethernet Adapter (VirtualBox Host-Only Network)
-        192.168.56.1/24 gw=0.0.0.0
-2. \Device\NPF_{9E13DC15-DBFB-4CE2-95D5-8DD283412185}   Intel(R) Dual Band Wireless-AC 8265 (Wi-Fi)
-        192.168.1.10/24 gw=192.168.1.1
+> python ./arpspoof.py 192.168.0.1 192.168.0.10
+ARP Spoofing 시작 -> VICTIM IP [{192.168.0.10}]
+[{192.168.0.10}]: POISON ARP Table [{11:22:33:44:55:66}] -> [{77:88:99:aa:bb:cc}]
+Ctrl + C를 누르면 ARP Spoofing을 종료합니다.
 ```
 
-Make host 192.168.1.5 believe our computer to be the default gateway 192.168.1.1, and thus send us its Internet-bound traffic, and make the gateway 192.168.1.1 believe our computer to be 192.168.1.5, and thus send replies to us:
+### 설치
+
+프로그램을 사용하기 위해서는 `scapy` 모듈이 필요합니다.
 
 ```
-C:\>arpspoof.exe 192.168.1.5
+> pip install scapy
 ```
 
-The same, but only in one direction 192.168.1.5 -> 192.168.1.1. The other direction does not pass through our computer:
+이후 [Releases](https://github.com/geolee1/KUS_arpspoof_2023/releases)에서 `arpspoof.py`를 저장 후 cli 환경에서 실행합니다.
 
 ```
-C:\>arpspoof.exe --oneway 192.168.1.5
+> python ./arpspoof.py [options] [<args>]
 ```
 
-### System Requirements
+### 사용법
 
-`arpspoof` was developed and tested on Windows 10. It should work on Windows Vista/7/8/10. It does NOT work on Windows XP, since it uses APIs introduced in Vista.
+```
+> python ./arpspoof.py --help
+ARP Spoofing Program 1.0.0
 
-`arpspoof` uses [WinPcap](https://www.winpcap.org/) or [Npcap](https://nmap.org/npcap/) to send spoofed packets and forward traffic. WinPcap/Npcap should be installed for `arpspoof` to run. Npcap is the more modern one, so it is recommended to use that. Note that [Wireshark](https://www.wireshark.org/) installs Npcap by default, so having Wireshark installed should be enough.
+usage: ./arpspoof.py [options] [<args>]
+
+Options:
+   <gateway ip> <target ip 1> [<target ip 2> ..]   ARP Spoofing
+   -n --network <gateway ip> <network CIDR>        ARP Spoofing for all network targets
+   -h --help                                       Show this help message
+```
+
+- 프로그램 인자로 `옵션을 주지 않으면` 타겟 ip들에 대해 gateway ip로 위장하여 스푸핑을 진행합니다.
+- `-n` 혹은 `--network` 옵션을 주면, 네트워크 CIDR에 대하여 ping을 통해 Live Host를 찾고, 찾은 ip에 스푸핑을 진행합니다.
+- `-h` 혹은 `--help` 옵션은 도움말을 출력합니다.
+
+### 주의사항
+
+스푸핑은 불법 사항이므로 개인 네트워크 망에서만 사용하길 바랍니다. 이 프로그램을 사용하므로 생긴 피해는 책임지지 않습니다.

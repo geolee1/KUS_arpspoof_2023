@@ -148,7 +148,9 @@ def main(*args, **kwargs) -> int:
         print(f"[{target_ip}]: POISON ARP Table [{gateway_mac}] -> [{own_mac}]")
         poisonARP(gateway_ip, target_ip, target_mac)
         # poisonARP(target_ip, gateway_ip, gateway_mac)
-        
+    
+    print("Ctrl + C를 누르면 ARP Spoofing을 종료합니다.")
+    
     try: # KeyboardInterrupt 발생 전까지 5초마다 ARP Spoofing을 계속한다.
         while True:
             for target_ip, target_mac in zip(target_ips, target_macs):
@@ -166,3 +168,4 @@ def main(*args, **kwargs) -> int:
 
 if __name__ == "__main__":
     sys.exit(main(argc=len(sys.argv), argv=sys.argv))
+
